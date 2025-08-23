@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { verifyToken } from "../middleware/auth";
 import { pool } from "../db";
+import { isEnabled, sendEmail, getApproverEmails, getUserEmail } from "../services/notifications";
 
 const router = Router();
 
@@ -136,6 +137,31 @@ router.post("/", verifyToken, async (req, res) => {
       [asset_id, fromDepartment || null, toDepartment, fromLocation || null, toLocation, reason, requestedById]
     );
 
+    // Notify approvers if enabled
+    try {
+      if (await isEnabled("transfer_approvals", "true") && await isEnabled("notifications_email", "true")) {
+        const emails = await getApproverEmails();
+        if (emails.length) {
+          await sendEmail(
+            emails,
+            `Asset transfer request for asset #${asset_id}`,
+            `<p>A new transfer request has been submitted.</p>
+             <ul>
+               <li>Asset ID: ${asset_id}</li>
+               <li>From: ${fromDepartment || "-"} / ${fromLocation || "-"}</li>
+               <li>To: ${toDepartment} / ${toLocation}</li>
+               <li>Reason: ${reason}</li>
+             </ul>
+             <p>Please log in to review and approve.</p>`,
+            undefined,
+            { eventType: 'transfer_request', meta: { asset_id, toDepartment, toLocation, requestedById } }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("Notification error (transfer request):", e);
+    }
+
     return res.status(201).json({ id: insertRes.rows[0].id });
   } catch (err) {
     console.error("POST /api/transfers error:", err);
@@ -164,6 +190,35 @@ router.put("/:id/approve", verifyToken, async (req, res) => {
 
     if (result.rowCount === 0) {
       return res.status(400).json({ message: "Transfer not in pending status or not found" });
+    }
+
+    // Notify requester
+    try {
+      if (await isEnabled("notifications_email", "true") && await isEnabled("transfer_approvals", "true")) {
+        const requesterRes = await pool.query<{ requested_by_id: number; asset_id: number; to_department: string; to_location: string }>(
+          `SELECT requested_by_id, asset_id, to_department, to_location FROM asset_transfers WHERE id = $1`,
+          [id]
+        );
+        const row = requesterRes.rows[0];
+        if (row) {
+          const requesterEmail = await getUserEmail(row.requested_by_id);
+          if (requesterEmail) {
+            await sendEmail(
+              requesterEmail,
+              `Your asset transfer request #${id} was approved`,
+              `<p>Your transfer request has been approved.</p>
+               <ul>
+                 <li>Asset ID: ${row.asset_id}</li>
+                 <li>Destination: ${row.to_department} / ${row.to_location}</li>
+               </ul>`,
+              undefined,
+              { eventType: 'transfer_approved', meta: { transfer_id: id, asset_id: row.asset_id } }
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Notification error (transfer approve):", e);
     }
 
     return res.json({ message: "Transfer approved" });
@@ -208,6 +263,29 @@ router.put("/:id/complete", verifyToken, async (req, res) => {
        WHERE id = $1`,
       [asset_id, to_department, to_location]
     );
+
+    // Notify asset manager/admins about completion
+    try {
+      if (await isEnabled("notifications_email", "true")) {
+        const emails = await getApproverEmails();
+        if (emails.length) {
+          await sendEmail(
+            emails,
+            `Transfer #${id} completed for asset #${asset_id}`,
+            `<p>The transfer has been completed.</p>
+             <ul>
+               <li>Asset ID: ${asset_id}</li>
+               <li>New Department: ${to_department || "(unchanged)"}</li>
+               <li>New Location: ${to_location || "(unchanged)"}</li>
+             </ul>`,
+            undefined,
+            { eventType: 'transfer_completed', meta: { transfer_id: id, asset_id, to_department, to_location } }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("Notification error (transfer complete):", e);
+    }
 
     return res.json({ message: "Transfer completed and asset updated" });
   } catch (err) {

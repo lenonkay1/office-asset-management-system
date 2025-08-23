@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { verifyToken } from "../middleware/auth";
 import { pool } from "../db";
+import { isEnabled, sendEmail, getApproverEmails, getUserEmail } from "../services/notifications";
 
 const router = Router();
 
@@ -213,6 +214,30 @@ router.post("/", verifyToken, async (req, res) => {
     );
 
     const created = mapMaintenanceRow(itemRes.rows[0]);
+
+    // Notify asset managers/admins of new maintenance schedule
+    try {
+      if (await isEnabled("maintenance_reminders", "true") && await isEnabled("notifications_email", "true")) {
+        const emails = await getApproverEmails();
+        if (emails.length) {
+          await sendEmail(
+            emails,
+            `Maintenance scheduled for asset #${created.asset.id}`,
+            `<p>A maintenance has been scheduled.</p>
+             <ul>
+               <li>Asset: ${created.asset.asset_name} (#${created.asset.id})</li>
+               <li>Title: ${created.title}</li>
+               <li>Scheduled Date: ${new Date(created.scheduledDate).toLocaleString()}</li>
+             </ul>`,
+            undefined,
+            { eventType: 'maintenance_scheduled', meta: { maintenance_id: created.id, asset_id: created.asset.id } }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("Notification error (maintenance schedule):", e);
+    }
+
     return res.status(201).json(created);
   } catch (err) {
     console.error("POST /api/maintenance error:", err);
@@ -243,6 +268,24 @@ router.put("/:id/complete", verifyToken, async (req, res) => {
        WHERE id = $1`,
       [id, notes || null, cost != null ? Number(cost) : null, performedBy || null]
     );
+
+    // Notify admins of maintenance completion
+    try {
+      if (await isEnabled("notifications_email", "true")) {
+        const emails = await getApproverEmails();
+        if (emails.length) {
+          await sendEmail(
+            emails,
+            `Maintenance #${id} marked completed`,
+            `<p>Maintenance has been marked completed.</p>`,
+            undefined,
+            { eventType: 'maintenance_completed', meta: { maintenance_id: id } }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("Notification error (maintenance complete):", e);
+    }
 
     return res.json({ message: "Maintenance marked as completed" });
   } catch (err) {
