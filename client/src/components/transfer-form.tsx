@@ -348,8 +348,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { QueryUtils } from "@/lib/queryClient";
 import { authService } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -399,9 +400,10 @@ export default function TransferForm({ onSuccess, onCancel }: TransferFormProps)
   const { toast } = useToast();
   const user = authService.getUser();
 
-  const { data: assets, isLoading: assetsLoading } = useQuery<Asset[]>({
-    queryKey: ["/api/assets/search", { q: assetSearch }],
-    enabled: assetSearch.length >= 2,
+  // Load assets for dropdown selection
+  const { data: assetsForSelect } = useQuery<{ assets: Asset[] }>({
+    queryKey: ["/api/assets?limit=1000"],
+    queryFn: async () => QueryUtils.fetchWithAuth<{ assets: Asset[] }>("/api/assets?limit=1000"),
   });
 
   const createTransferMutation = useMutation({
@@ -418,8 +420,7 @@ export default function TransferForm({ onSuccess, onCancel }: TransferFormProps)
         requestedById: user?.id
       };
       
-      const response = await apiRequest("POST", "/api/transfers", payload);
-      return response.json();
+      return apiRequest("POST", "/api/transfers", payload);
     },
     onSuccess: () => {
       toast({
@@ -498,55 +499,34 @@ export default function TransferForm({ onSuccess, onCancel }: TransferFormProps)
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Asset Selection */}
+        {/* Asset Selection (Dropdown) */}
         <div>
-          <Label htmlFor="assetSearch">Select Asset *</Label>
-          <div className="relative mt-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-            <Input
-              id="assetSearch"
-              value={assetSearch}
-              onChange={(e) => setAssetSearch(e.target.value)}
-              placeholder="Search by asset ID or name..."
-              className="pl-10"
-              disabled={createTransferMutation.isPending}
-            />
-          </div>
-          
-          {/* Asset Search Results */}
-          {assetSearch.length >= 2 && assets && assets.length > 0 && !selectedAsset && (
-            <div className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-              {assets.map((asset) => (
-                <div
-                  key={asset.id}
-                  onClick={() => handleAssetSelect(asset)}
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-gray-900">{asset.asset_id} - {asset.asset_name}</p>
-                      <p className="text-sm text-gray-600">
-                        {getDepartmentLabel(asset.assigned_department)} • {asset.current_location}
-                        {asset.serial_number && ` • S/N: ${asset.serial_number}`}
-                      </p>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      asset.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
-                    }`}>
-                      {asset.status}
-                    </span>
-                  </div>
-                </div>
+          <Label htmlFor="assetSelect">Select Asset *</Label>
+          <Select
+            value={formData.asset_id ? String(formData.asset_id) : ""}
+            onValueChange={(value) => {
+              const id = parseInt(value, 10);
+              const asset = (assetsForSelect?.assets || []).find(a => a.id === id) || null;
+              if (asset) {
+                handleAssetSelect(asset);
+              }
+            }}
+            disabled={createTransferMutation.isPending}
+          >
+            <SelectTrigger id="assetSelect" className="mt-1">
+              <SelectValue placeholder="Select an asset" />
+            </SelectTrigger>
+            <SelectContent>
+              {(assetsForSelect?.assets || []).map((asset) => (
+                <SelectItem key={asset.id} value={String(asset.id)}>
+                  {asset.asset_id} • {asset.asset_name}{asset.serial_number ? ` (SN: ${asset.serial_number})` : ""}
+                </SelectItem>
               ))}
-            </div>
-          )}
+            </SelectContent>
+          </Select>
 
-          {assetSearch.length >= 2 && assets && assets.length === 0 && !assetsLoading && (
-            <p className="text-sm text-gray-600 mt-2">No assets found matching your search.</p>
-          )}
-
-          {errors.asset_id && ( // Changed from assetId
-            <p className="text-sm text-red-600 mt-1">{errors.asset_id}</p> // Changed from assetId
+          {errors.asset_id && (
+            <p className="text-sm text-red-600 mt-1">{errors.asset_id}</p>
           )}
         </div>
 

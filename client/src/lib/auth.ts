@@ -139,6 +139,10 @@ class AuthService {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Auto-logout on unauthorized to clear stale/invalid token
+        this.logout();
+      }
       const error = await response.json().catch(() => ({}));
       throw new Error(error.message || `Request failed: ${response.status}`);
     }

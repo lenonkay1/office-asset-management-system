@@ -223,41 +223,57 @@ export const transferStatusEnum = pgEnum("transfer_status", ["pending", "approve
 export const maintenanceStatusEnum = pgEnum("maintenance_status", ["scheduled", "in_progress", "completed", "cancelled"]);
 
 // Users table - Updated to snake_case
+// export const users = pgTable("users", {
+//   id: serial("id").primaryKey(),
+//   username: text("username").notNull().unique(),
+//   password: text("password").notNull(),
+//   email: text("email").notNull().unique(),
+//   full_name: text("full_name").notNull(), // Changed from fullName
+//   role: userRoleEnum("role").notNull().default("staff"),
+//   department: text("department").notNull(),
+//   is_active: boolean("is_active").notNull().default(true), // Changed from isActive
+//   created_at: timestamp("created_at").notNull().defaultNow(), // Changed from createdAt
+//   updated_at: timestamp("updated_at").notNull().defaultNow(), // Changed from updatedAt
+// });
+
+  // server/shared/schema.ts
+import { varchar,numeric,  } from "drizzle-orm/pg-core";
+
+// server/shared/schema.ts
+
+// ===== USERS TABLE =====
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
+  username: varchar("username", { length: 50 }).notNull(),
   password: text("password").notNull(),
-  email: text("email").notNull().unique(),
-  full_name: text("full_name").notNull(), // Changed from fullName
-  role: userRoleEnum("role").notNull().default("staff"),
-  department: text("department").notNull(),
-  is_active: boolean("is_active").notNull().default(true), // Changed from isActive
-  created_at: timestamp("created_at").notNull().defaultNow(), // Changed from createdAt
-  updated_at: timestamp("updated_at").notNull().defaultNow(), // Changed from updatedAt
+  email: varchar("email", { length: 100 }).notNull(),
+  full_name: varchar("full_name", { length: 100 }).notNull(),
+  department: varchar("department", { length: 100 }).notNull(),
+  role: varchar("role", { length: 50 }).notNull(), // admin, asset_manager, department_head, staff
+  is_active: boolean("is_active").default(true).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Assets table - Updated to snake_case
+// ===== ASSETS TABLE =====
 export const assets = pgTable("assets", {
   id: serial("id").primaryKey(),
-  asset_id: text("asset_id").notNull().unique(), // Changed from assetId
-  asset_name: text("asset_name").notNull(), // Changed from name
+  asset_name: varchar("asset_name", { length: 100 }).notNull(),
   description: text("description"),
-  category: assetCategoryEnum("category").notNull(),
-  serial_number: text("serial_number"), // Changed from serialNumber
-  model: text("model"),
-  manufacturer: text("manufacturer"),
-  purchase_date: timestamp("purchase_date"), // Changed from purchaseDate
-  purchase_cost: decimal("purchase_cost", { precision: 10, scale: 2 }), // Changed from purchaseCost
-  warranty_expiry: timestamp("warranty_expiry"), // Changed from warrantyExpiry
-  current_location: text("current_location").notNull(), // Changed from currentLocation
-  assigned_department: text("assigned_department").notNull(),
-  assigned_user_id: integer("assigned_user_id"), // Changed from assignedUserId
-  status: assetStatusEnum("status").notNull().default("active"),
-  condition: text("condition").notNull().default("good"),
-  notes: text("notes"),
-  created_at: timestamp("created_at").notNull().defaultNow(), // Changed from createdAt
-  updated_at: timestamp("updated_at").notNull().defaultNow(), // Changed from updatedAt
+  category: varchar("category", { length: 50 }),
+  serial_number: varchar("serial_number", { length: 50 }),
+  model: varchar("model", { length: 50 }),
+  manufacturer: varchar("manufacturer", { length: 50 }),
+  purchase_date: timestamp("purchase_date"),
+  purchase_cost: numeric("purchase_cost", { precision: 12, scale: 2 }),
+  warranty_expiry: timestamp("warranty_expiry"),
+  status: varchar("status", { length: 20 }).default("active"),
+  assigned_user_id: integer("assigned_user_id"), // <- rename here
+ // can reference users.id if you implement relations
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
+
 
 // Asset transfers table - Updated to snake_case
 export const asset_transfers = pgTable("asset_transfers", { // Changed from assetTransfers

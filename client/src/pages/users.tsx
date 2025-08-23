@@ -200,6 +200,9 @@
 //     </div>
 //   );
 // }
+
+
+
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -229,6 +232,8 @@ import {
 } from "lucide-react";
 import {CreateUserDialog} from "@/components/CreateUserDialog";
 import EditUserDialog from "@/components/EditUserDialog";
+import { authService } from "../lib/auth";
+import { response } from "express";
 
 type User = {
   id: number;
@@ -243,10 +248,6 @@ type User = {
 
 const fetchUsers = async (): Promise<User[]> => {
   return authService.authFetch<User[]>("/api/users");
-  if (!response.ok) {
-    throw new Error('Failed to fetch users');
-  }
-  return await response.json();
 };
 
 export default function Users() {

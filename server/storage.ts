@@ -1,216 +1,238 @@
-// server/storage.ts
-import { db } from "./db";
-import { users, assets, asset_transfers, maintenance_schedules, asset_audit_logs } from "@shared/schema";
-import { eq, ilike, and, sql } from "drizzle-orm";
+import { Pool } from "pg";
+import dotenv from "dotenv";
+dotenv.config();
 
-// ===== USERS =====
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// ==================== USERS ====================
+
+// Get all users
+export async function getAllUsers() {
+  const { rows } = await pool.query(
+    `SELECT id, username, email, full_name, role, department, is_active, created_at, updated_at 
+     FROM users ORDER BY created_at DESC`
+  );
+  return rows;
+}
+
+// Get user by ID
+export async function getUser(id: number) {
+  const { rows } = await pool.query(
+    `SELECT id, username, email, full_name, role, department, is_active, created_at, updated_at
+     FROM users WHERE id = $1`,
+    [id]
+  );
+  return rows[0];
+}
+
+// Get user by username
 export async function getUserByUsername(username: string) {
-  const result = await db
-    .select()
-    .from(users)
-    .where(eq(users.username, username))
-    .limit(1);
-  return result[0] || null;
+  const { rows } = await pool.query(
+    `SELECT * FROM users WHERE username = $1`,
+    [username]
+  );
+  return rows[0];
 }
 
-// ===== ASSETS =====
-export async function getAssets(limit: number, offset: number, filters: any) {
-  const conditions = [];
-
-  if (filters.search) {
-    // Matches asset name OR description
-    conditions.push(ilike(assets.name, `%${filters.search}%`));
-  }
-  if (filters.status) {
-    conditions.push(eq(assets.status, filters.status));
-  }
-  if (filters.category) {
-    conditions.push(eq(assets.category, filters.category));
-  }
-
-  const whereClause = conditions.length ? and(...conditions) : undefined;
-
-  const result = await db
-    .select()
-    .from(assets)
-    .where(whereClause)
-    .limit(limit)
-    .offset(offset);
-
-  // total count for pagination
-  const totalCount = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(assets)
-    .where(whereClause);
-
-  return {
-    assets: result,
-    total: Number(totalCount[0]?.count || 0),
-  };
-}
-export async function getOverdueMaintenances() {
-  const today = new Date();
-  const result = await db
-    .select({
-      id: maintenance_schedules.id,
-      title: maintenance_schedules.title,
-      asset_id: assets.asset_id,
-      scheduled_date: maintenance_schedules.scheduled_date,
-    })
-    .from(maintenance_schedules)
-    .leftJoin(assets, eq(maintenance_schedules.asset_id, assets.id))
-    .where(
-      and(
-        eq(maintenance_schedules.status, "scheduled"),
-        sql`${maintenance_schedules.scheduled_date} < ${today}`
-      )
-    );
-  
-  return result.map(maintenance => ({
-    ...maintenance,
-    asset_id: maintenance.asset_id || 'Unknown',
-  }));
-}
-
-export async function getRecentActivity(limit: number = 10) {
-  const result = await db
-    .select({
-      id: asset_audit_logs.id,
-      action: asset_audit_logs.action,
-      timestamp: asset_audit_logs.timestamp,
-      asset_id: assets.asset_id,
-      asset_name: assets.asset_name,
-      user_name: users.full_name,
-      serial_number: assets.serial_number,
-      current_location: assets.current_location,
-    })
-    .from(asset_audit_logs)
-    .leftJoin(assets, eq(asset_audit_logs.asset_id, assets.id))
-    .leftJoin(users, eq(asset_audit_logs.performed_by_id, users.id))
-    .orderBy(sql`${asset_audit_logs.timestamp} DESC`)
-    .limit(limit);
-  
-  return result.map(log => ({
-    ...log,
-    asset_id: log.asset_id || 'Unknown',
-    asset_name: log.asset_name || 'Unknown Asset',
-    user_name: log.user_name || 'Unknown User',
-  }));
-}
-
-export async function getDashboardStats() {
-  // Get total assets
-  const totalAssetsResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(assets);
-  const totalAssets = Number(totalAssetsResult[0]?.count || 0);
-
-  // Get active assets
-  const activeAssetsResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(assets)
-    .where(eq(assets.status, "active"));
-  const activeAssets = Number(activeAssetsResult[0]?.count || 0);
-
-  // Get maintenance assets
-  const maintenanceAssetsResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(assets)
-    .where(eq(assets.status, "maintenance"));
-  const maintenanceAssets = Number(maintenanceAssetsResult[0]?.count || 0);
-
-  // Get retired assets
-  const retiredAssetsResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(assets)
-    .where(eq(assets.status, "retired"));
-  const retiredAssets = Number(retiredAssetsResult[0]?.count || 0);
-
-  // Get pending transfers
-  const pendingTransfersResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(asset_transfers)
-    .where(eq(asset_transfers.status, "pending"));
-  const pendingTransfers = Number(pendingTransfersResult[0]?.count || 0);
-
-  // Get overdue maintenances
-  const today = new Date();
-  const overdueMaintenancesResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(maintenance_schedules)
-    .where(
-      and(
-        eq(maintenance_schedules.status, "scheduled"),
-        sql`${maintenance_schedules.scheduled_date} < ${today}`
-      )
-    );
-  const overdueMaintenances = Number(overdueMaintenancesResult[0]?.count || 0);
-
-  return {
-    total_assets: totalAssets,
-    active_assets: activeAssets,
-    maintenance_assets: maintenanceAssets,
-    retired_assets: retiredAssets,
-    pending_transfers: pendingTransfers,
-    overdue_maintenances: overdueMaintenances,
-  };
-}
-
-export async function createAsset(assetData: {
-  asset_id: string;
-  asset_name: string;
-  description?: string;
-  category: string;
-  serial_number?: string;
-  model?: string;
-  manufacturer?: string;
-  purchase_date?: Date | null;
-  purchase_cost?: number;
-  warranty_expiry?: Date | null;
-  current_location: string;
-  assigned_department: string;
-  assigned_user_id?: number;
-  status?: string;
-  condition?: string;
-  notes?: string;
+// Create new user
+export async function createUser(user: {
+  username: string;
+  password: string;
+  email: string;
+  full_name: string;
+  role: string;
+  department: string;
+  is_active: boolean;
 }) {
-  const result = await db
-    .insert(assets)
-    .values({
-      asset_id: assetData.asset_id,
-      asset_name: assetData.asset_name,
-      description: assetData.description,
-      category: assetData.category as any,
-      serial_number: assetData.serial_number,
-      model: assetData.model,
-      manufacturer: assetData.manufacturer,
-      purchase_date: assetData.purchase_date,
-      purchase_cost: assetData.purchase_cost,
-      warranty_expiry: assetData.warranty_expiry,
-      current_location: assetData.current_location,
-      assigned_department: assetData.assigned_department,
-      assigned_user_id: assetData.assigned_user_id,
-      status: (assetData.status as any) || "active",
-      condition: assetData.condition || "good",
-      notes: assetData.notes,
-    })
-    .returning();
-  
-  return result[0];
+  const { username, password, email, full_name, role, department, is_active } = user;
+
+  const { rows } = await pool.query(
+    `INSERT INTO users (username, password, email, full_name, role, department, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, username, email, full_name, role, department, is_active, created_at, updated_at`,
+    [username, password, email, full_name, role, department, is_active]
+  );
+
+  return rows[0];
 }
 
-export async function getAssetCategories() {
-  const result = await db
-    .select({
-      category: assets.category,
-      count: sql<number>`COUNT(*)`,
-    })
-    .from(assets)
-    .groupBy(assets.category);
-  
-  return result.map(row => ({
-    category: row.category,
-    count: Number(row.count),
-  }));
+// Update user
+export async function updateUser(id: number, data: Partial<{
+  username: string;
+  password: string;
+  email: string;
+  full_name: string;
+  role: string;
+  department: string;
+  is_active: boolean;
+}>) {
+  // Only allow updating known columns
+  const allowed: (keyof typeof data)[] = [
+    "username",
+    "password",
+    "email",
+    "full_name",
+    "role",
+    "department",
+    "is_active",
+  ];
+  const filtered: Record<string, any> = {};
+  for (const key of allowed) {
+    if (key in (data || {})) filtered[key] = (data as any)[key];
+  }
+
+  const fields = Object.keys(filtered);
+  if (fields.length === 0) return null;
+
+  const setQuery = fields.map((f, idx) => `${f} = $${idx + 1}`).join(", ");
+  const values = Object.values(filtered);
+
+  const { rows } = await pool.query(
+    `UPDATE users SET ${setQuery}, updated_at = NOW() WHERE id = $${fields.length + 1} 
+     RETURNING id, username, email, full_name, role, department, is_active, created_at, updated_at`,
+    [...values, id]
+  );
+
+  return rows[0];
 }
 
+// Delete user
+export async function deleteUser(id: number) {
+  const { rowCount } = await pool.query(`DELETE FROM users WHERE id = $1`, [id]);
+  return rowCount > 0;
+}
+
+// ==================== ASSETS ====================
+
+export async function getAssets(limit: number, offset: number, _filters: any) {
+  // Include next scheduled maintenance date, and derive location/department if missing
+  const { rows: assetsRows } = await pool.query(
+    `SELECT 
+       a.id, a.asset_name, a.description,
+       COALESCE(a.category, 'other') AS category,
+       a.serial_number, a.model, a.manufacturer,
+       a.purchase_date, a.purchase_cost, a.warranty_expiry,
+       COALESCE(a.current_location,
+         (SELECT t.to_location FROM asset_transfers t WHERE t.asset_id = a.id AND t.status IN ('approved','completed')
+          ORDER BY COALESCE(t.updated_at, t.created_at) DESC LIMIT 1)
+       ) AS current_location,
+       COALESCE(a.assigned_department,
+         (SELECT t.to_department FROM asset_transfers t WHERE t.asset_id = a.id AND t.status IN ('approved','completed')
+          ORDER BY COALESCE(t.updated_at, t.created_at) DESC LIMIT 1)
+       ) AS assigned_department,
+       a.assigned_user_id, a.status, a.created_at, a.updated_at,
+       (
+         SELECT MIN(ms.scheduled_date)
+         FROM maintenance_schedules ms
+         WHERE ms.asset_id = a.id AND ms.status = 'scheduled'
+       ) AS next_maintenance_date,
+       (
+         SELECT MAX(t.completed_at)
+         FROM asset_transfers t
+         WHERE t.asset_id = a.id AND t.status = 'completed'
+       ) AS last_transfer_at
+     FROM assets a
+     ORDER BY a.id DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
+
+  const { rows: countRows } = await pool.query(`SELECT COUNT(*) FROM assets`);
+  const total = parseInt(countRows[0].count, 10);
+
+  return { assets: assetsRows, total };
+}
+
+export async function addAsset(assetData: any) {
+  // Insert columns including current_location and assigned_department when available
+  const { rows } = await pool.query(
+    `INSERT INTO assets (
+      asset_name, description, category, serial_number, model, manufacturer,
+      purchase_date, purchase_cost, warranty_expiry, status, assigned_user_id,
+      current_location, assigned_department
+    ) VALUES (
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
+    ) RETURNING *`,
+    [
+      assetData.asset_name,
+      assetData.description ?? null,
+      assetData.category ?? null,
+      assetData.serial_number ?? null,
+      assetData.model ?? null,
+      assetData.manufacturer ?? null,
+      assetData.purchase_date ?? null,
+      assetData.purchase_cost ?? null,
+      assetData.warranty_expiry ?? null,
+      assetData.status ?? "active",
+      assetData.assigned_user_id ?? null,
+      assetData.current_location ?? null,
+      assetData.assigned_department ?? null,
+    ]
+  );
+  return rows[0];
+}
+
+export async function updateAsset(id: number, assetData: any) {
+  // Whitelist updatable columns to avoid referencing non-existent columns
+  const allowed = [
+    "asset_name",
+    "description",
+    "category",
+    "serial_number",
+    "model",
+    "manufacturer",
+    "purchase_date",
+    "purchase_cost",
+    "warranty_expiry",
+    "status",
+    "assigned_user_id",
+    "current_location",
+    "assigned_department",
+  ];
+  const filtered: Record<string, any> = {};
+  for (const key of allowed) if (key in assetData) filtered[key] = assetData[key];
+
+  const fields = Object.keys(filtered);
+  if (fields.length === 0) return null;
+
+  const setQuery = fields.map((f, idx) => `${f} = $${idx + 1}`).join(", ");
+  const values = Object.values(filtered);
+
+  const { rows } = await pool.query(
+    `UPDATE assets SET ${setQuery} WHERE id = $${fields.length + 1} RETURNING *`,
+    [...values, id]
+  );
+  return rows[0];
+}
+
+export async function deleteAsset(id: number) {
+  const { rowCount } = await pool.query(`DELETE FROM assets WHERE id = $1`, [id]);
+  return rowCount > 0;
+}
+
+// Search assets by id code, name, or serial number (simple)
+export async function searchAssets(q: string, limit = 20) {
+  const query = `%${q.toLowerCase()}%`;
+  const { rows } = await pool.query(
+    `SELECT 
+        a.id, a.asset_name, a.serial_number, a.model, a.status, a.assigned_user_id,
+        COALESCE(a.assigned_department,
+          (SELECT t.to_department FROM asset_transfers t WHERE t.asset_id = a.id AND t.status IN ('approved','completed')
+           ORDER BY COALESCE(t.updated_at, t.created_at) DESC LIMIT 1)
+        ) AS assigned_department,
+        COALESCE(a.current_location,
+          (SELECT t.to_location FROM asset_transfers t WHERE t.asset_id = a.id AND t.status IN ('approved','completed')
+           ORDER BY COALESCE(t.updated_at, t.created_at) DESC LIMIT 1)
+        ) AS current_location
+     FROM assets a
+     WHERE LOWER(a.asset_name) LIKE $1
+        OR LOWER(COALESCE(a.serial_number, '')) LIKE $1
+        OR CAST(a.id AS TEXT) LIKE $2
+     ORDER BY a.id DESC
+     LIMIT $3`,
+    [query, `%${q}%`, limit]
+  );
+  return rows;
+}

@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { authService } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { QueryUtils } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface Asset {
@@ -124,6 +125,16 @@ export default function Maintenance() {
     queryKey: ["/api/maintenance", { page, limit }],
   });
 
+  // Load assets for scheduling dropdown
+  type AssetOption = { id: number; asset_id: string; asset_name: string; serial_number: string | null };
+  const { data: assetsForSelect } = useQuery<{ assets: AssetOption[] }>({
+    queryKey: ["/api/assets?limit=1000"],
+    queryFn: async () => {
+      const res = await QueryUtils.fetchWithAuth<{ assets: AssetOption[] }>("/api/assets?limit=1000");
+      return res;
+    }
+  });
+
   const { data: overdueMaintenances } = useQuery({
     queryKey: ["/api/dashboard/overdue-maintenances"],
   });
@@ -131,17 +142,18 @@ export default function Maintenance() {
   const createMaintenanceMutation = useMutation({
     mutationFn: async (data: MaintenanceFormData) => {
       const payload = {
-        ...data,
-        asset_id: parseInt(data.asset_id),
+        asset_id: parseInt(data.asset_id, 10),
+        title: data.title,
+        description: data.description || null,
         scheduledDate: new Date(data.scheduledDate)
       };
-      const response = await apiRequest("POST", "/api/maintenance", payload);
-      return response.json();
+      return apiRequest("POST", "/api/maintenance", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/overdue-maintenances"] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
       toast({
         title: "Maintenance Scheduled",
         description: "The maintenance has been scheduled successfully.",
@@ -160,12 +172,11 @@ export default function Maintenance() {
 
   const completeMaintenanceMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("PUT", `/api/maintenance/${id}/complete`, {
-        notes: completeFormData.notes,
+      return apiRequest("PUT", `/api/maintenance/${id}/complete`, {
+        notes: completeFormData.notes || null,
         cost: completeFormData.cost ? parseFloat(completeFormData.cost) : null,
-        performedBy: completeFormData.performedBy
+        performedBy: completeFormData.performedBy || null
       });
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
@@ -291,14 +302,22 @@ export default function Maintenance() {
                 </DialogHeader>
                 <form onSubmit={handleScheduleMaintenance} className="space-y-4">
                   <div>
-                    <Label htmlFor="asset_id">Asset ID</Label>
-                    <Input
-                      id="asset_id"
+                    <Label htmlFor="asset_id">Asset</Label>
+                    <Select
                       value={formData.asset_id}
-                      onChange={(e) => setFormData(prev => ({ ...prev, asset_id: e.target.value }))}
-                      placeholder="Enter asset ID"
-                      required
-                    />
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, asset_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an asset" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(assetsForSelect?.assets || []).map(a => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.asset_id} • {a.asset_name}{a.serial_number ? ` (SN: ${a.serial_number})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="title">Maintenance Title</Label>
@@ -526,14 +545,22 @@ export default function Maintenance() {
                     </DialogHeader>
                     <form onSubmit={handleScheduleMaintenance} className="space-y-4">
                       <div>
-                        <Label htmlFor="asset_id">Asset ID</Label>
-                        <Input
-                          id="asset_id"
+                        <Label htmlFor="asset_id">Asset</Label>
+                        <Select
                           value={formData.asset_id}
-                          onChange={(e) => setFormData(prev => ({ ...prev, asset_id: e.target.value }))}
-                          placeholder="Enter asset ID"
-                          required
-                        />
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, asset_id: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an asset" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(assetsForSelect?.assets || []).map(a => (
+                              <SelectItem key={a.id} value={String(a.id)}>
+                                {a.asset_id} • {a.asset_name}{a.serial_number ? ` (SN: ${a.serial_number})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="title">Maintenance Title</Label>

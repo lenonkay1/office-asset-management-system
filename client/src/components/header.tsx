@@ -39,7 +39,7 @@ export default function Header() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">JSC Asset Management</h1>
+                <h1 className="text-xl font-semibold text-gray-900">Office Asset Management</h1>
                 <p className="text-xs text-gray-600">Judicial Service Commission</p>
               </div>
             </div>

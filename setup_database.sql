@@ -1,4 +1,4 @@
--- Setup database for JSC Asset Management System
+-- Setup database for Office Asset Management System
 
 -- Drop existing tables if they exist (for clean setup)
 DROP TABLE IF EXISTS asset_audit_logs CASCADE;

@@ -1,4 +1,4 @@
-# JSC Asset Management System
+# Office Asset Management System
 
 ## Overview
 A comprehensive web-based Office Asset Management System for the Judicial Service Commission (JSC) built with Node.js, React.js, and PostgreSQL database. The system provides role-based access control, asset tracking, maintenance scheduling, and comprehensive reporting capabilities.

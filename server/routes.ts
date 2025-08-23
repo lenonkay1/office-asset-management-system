@@ -152,10 +152,16 @@ import bcrypt from "bcrypt";
 import * as storage from "./storage";
 import { verifyToken as authenticateToken } from "./middleware/verifyToken";
 import jwt from "jsonwebtoken";
+import dashboardRouter from "./routes/dashboard";
 
 export function registerRoutes(app: Express): Server {
   app.use(cors());
   app.use(express.json());
+  app.use("/api/assets", assetsRouter);   // if you already have this
+  app.use("/api/users", usersRouter);     // if you already have this
+
+  // new dashboard route
+  app.use("/api/dashboard", dashboardRouter);
 
   // Auth routes
   app.post("/api/auth/login", async (req: Request, res: Response) => {
@@ -240,6 +246,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Assets route - Updated to match schema
+  // Assets route - safer + logs
   app.get("/api/assets", authenticateToken, async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -253,17 +260,22 @@ export function registerRoutes(app: Express): Server {
 
       const assetsResult = await storage.getAssets(limit, offset, filters);
 
+      console.log("Fetched assetsResult:", assetsResult); // 👈 debug log
+
       if (!assetsResult) {
-        return res.status(404).json({ message: "Assets not found" });
+        return res.json({ assets: [], pagination: { total: 0, page, limit, total_pages: 0 } });
       }
 
-      // Transform assets to match frontend expectations if needed
-      const transformedAssets = Array.isArray(assetsResult) 
-        ? assetsResult 
-        : assetsResult.assets.map((asset: any) => ({
-            ...asset,
-            // Add any transformations here if needed
-          }));
+      let transformedAssets: any[] = [];
+
+      if (Array.isArray(assetsResult)) {
+        transformedAssets = assetsResult;
+      } else if (assetsResult.assets && Array.isArray(assetsResult.assets)) {
+        transformedAssets = assetsResult.assets;
+      } else {
+        console.warn("Unexpected assetsResult shape:", assetsResult);
+        transformedAssets = [];
+      }
 
       return res.json({
         assets: transformedAssets,

@@ -98,8 +98,7 @@ export default function Transfers() {
 
   const approveTransferMutation = useMutation({
     mutationFn: async (transferId: number) => {
-      const response = await apiRequest("PUT", `/api/transfers/${transferId}/approve`, {});
-      return response.json();
+      return apiRequest("PUT", `/api/transfers/${transferId}/approve`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
@@ -113,6 +112,28 @@ export default function Transfers() {
       toast({
         title: "Error",
         description: error.message || "Failed to approve transfer.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const completeTransferMutation = useMutation({
+    mutationFn: async (transferId: number) => {
+      return apiRequest("PUT", `/api/transfers/${transferId}/complete`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      toast({
+        title: "Transfer Completed",
+        description: "The transfer has been marked as completed and asset updated.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete transfer.",
         variant: "destructive",
       });
     }
@@ -156,8 +177,16 @@ export default function Transfers() {
            transfer.requestedById !== user.id;
   };
 
+  const canCompleteTransfer = (transfer: AssetTransfer) => {
+    return user && ["admin", "asset_manager", "department_head"].includes(user.role) && transfer.status === "approved";
+  };
+
   const handleApproveTransfer = (transferId: number) => {
     approveTransferMutation.mutate(transferId);
+  };
+
+  const handleCompleteTransfer = (transferId: number) => {
+    completeTransferMutation.mutate(transferId);
   };
 
   const handleTransferSuccess = () => {
@@ -333,6 +362,17 @@ export default function Transfers() {
                               size="sm"
                               onClick={() => handleApproveTransfer(transfer.id)}
                               disabled={approveTransferMutation.isPending}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canCompleteTransfer(transfer) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCompleteTransfer(transfer.id)}
+                              disabled={completeTransferMutation.isPending}
                               className="text-green-600 hover:text-green-700 hover:bg-green-50"
                             >
                               <CheckCircle className="h-4 w-4" />

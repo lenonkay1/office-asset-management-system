@@ -16,6 +16,7 @@
       "@/*": ["src/*"],
       "@shared/*": ["../shared/*"],
       "@components/*": ["components/*"],
+      "./utils": ["./server/utils"],
       "@pages/*": ["pages/*"]
     }
   },
