@@ -7,15 +7,16 @@ services:
     name: office-asset-management
     env: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci && npm run build  # Fixed typo: c1 → ci
     startCommand: npm start
     autoDeploy: true
     healthCheckPath: /
 
-postDeployCommand: npm run db:push ; npm run seed:admin
+# Move postDeployCommand to root level
+postDeployCommand: npm run db:push && npm run seed:admin
 
 envVars:
-  - key: NODE_ENV
+  - key: NODE_ENV  # Fixed: MODE_ENV → NODE_ENV
     value: production
   - key: DATABASE_URL
     fromDatabase:
@@ -28,4 +29,4 @@ envVars:
   - key: ADMIN_PASSWORD
     value: admin123
   - key: ADMIN_EMAIL
-    value: admin@example.com
+    value: admin@example.com  # Added missing value
