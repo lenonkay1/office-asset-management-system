@@ -13,7 +13,7 @@ services:
     healthCheckPath: /
 
 # Move postDeployCommand to root level
-postDeployCommand: npm run db:push && npm run seed:admin
+postDeployCommand: npm run db:push ; npm run seed:admin
 
 envVars:
   - key: NODE_ENV  # Fixed: MODE_ENV → NODE_ENV
