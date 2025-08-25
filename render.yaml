@@ -11,7 +11,7 @@ services:
     startCommand: npm start
     autoDeploy: true
     healthCheckPath: /
-    postDeployCommand: npm run db:push && npm run seed:admin
+    postDeployCommand: sh -c "npm run db:push && npm run seed:admin"
     envVars:
       - key: NODE_ENV
         value: production
