@@ -803,11 +803,11 @@ export default function Dashboard() {
                   <Package className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
-              <div className="flex items-center mt-4">
+              {/* <div className="flex items-center mt-4">
                 <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
                 <span className="text-sm text-green-600 font-medium">+12%</span>
                 <span className="text-sm text-gray-600 ml-1">from last month</span>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
@@ -829,12 +829,12 @@ export default function Dashboard() {
                   <CheckCircle className="h-6 w-6 text-green-600" />
                 </div>
               </div>
-              <div className="flex items-center mt-4">
+              {/* <div className="flex items-center mt-4">
                 <span className="text-sm text-green-600 font-medium">
                   {utilizationRate}%
                 </span>
                 <span className="text-sm text-gray-600 ml-1">utilization</span>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
@@ -856,11 +856,11 @@ export default function Dashboard() {
                   <Wrench className="h-6 w-6 text-orange-600" />
                 </div>
               </div>
-              <div className="flex items-center mt-4">
+              {/* <div className="flex items-center mt-4">
                 <TrendingDown className="h-4 w-4 text-orange-500 mr-1" />
                 <span className="text-sm text-orange-600 font-medium">-8</span>
                 <span className="text-sm text-gray-600 ml-1">from last week</span>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
@@ -882,10 +882,10 @@ export default function Dashboard() {
                   <ArrowLeftRight className="h-6 w-6 text-red-600" />
                 </div>
               </div>
-              <div className="flex items-center mt-4">
+              {/* <div className="flex items-center mt-4">
                 <span className="text-sm text-red-600 font-medium">+5</span>
                 <span className="text-sm text-gray-600 ml-1">requires attention</span>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
         </div>

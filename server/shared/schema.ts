@@ -210,7 +210,7 @@
 // export type InsertAssetAuditLog = z.infer<typeof insertAssetAuditLogSchema>;
 
 
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, pgEnum, varchar, numeric } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -267,13 +267,21 @@ export const assets = pgTable("assets", {
   purchase_date: timestamp("purchase_date"),
   purchase_cost: numeric("purchase_cost", { precision: 12, scale: 2 }),
   warranty_expiry: timestamp("warranty_expiry"),
+  // Added fields used by the API layer
+  current_location: varchar("current_location", { length: 100 }),
+  assigned_department: varchar("assigned_department", { length: 100 }),
   status: varchar("status", { length: 20 }).default("active"),
   assigned_user_id: integer("assigned_user_id"), // <- rename here
- // can reference users.id if you implement relations
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Settings table for key-value configuration
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // Asset transfers table - Updated to snake_case
 export const asset_transfers = pgTable("asset_transfers", { // Changed from assetTransfers
@@ -437,7 +445,7 @@ export const insertAssetAuditLogSchema = createInsertSchema(asset_audit_logs).om
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Asset = typeof assets.$inferSelect;
-export type InsertAsset = z.infer<typeof insertUserSchema>;
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export type AssetTransfer = typeof asset_transfers.$inferSelect; // Changed from assetTransfers
 export type MaintenanceSchedule = typeof maintenance_schedules.$inferSelect; // Changed from maintenanceSchedules
 export type AssetAuditLog = typeof asset_audit_logs.$inferSelect; // Changed from assetAuditLogs

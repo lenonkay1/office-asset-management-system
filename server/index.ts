@@ -107,6 +107,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import path from "path";
+import { fileURLToPath } from "url";
 import { verifyToken } from "./middleware/auth";
 import assetsRouter from "./routes/assets";
 import usersRouter from "./routes/users";
@@ -181,6 +183,19 @@ app.get("/api/auth/me", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch user" });
   }
 });
+
+// === Serve static client in production ===
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+if (process.env.NODE_ENV === "production") {
+  const publicDir = path.resolve(__dirname, "./public");
+  app.use(express.static(publicDir));
+  // SPA fallback (except for API routes)
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) return next();
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+}
 
 // === Start server ===
 const PORT = process.env.PORT || 5000;
