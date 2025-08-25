@@ -12,7 +12,7 @@ services:
     autoDeploy: true
     healthCheckPath: /
 
-postDeployCommand: npm run db:push && npm run seed:admin
+postDeployCommand: npm run db:push ; npm run seed:admin
 
 envVars:
   - key: NODE_ENV
