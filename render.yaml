@@ -1,4 +1,4 @@
-databases:
+databases: 
   - name: office-assets-db
     plan: free
 
@@ -11,6 +11,7 @@ services:
     startCommand: npm start
     autoDeploy: true
     healthCheckPath: /
+    postDeployCommand: npm run db:push && npm run seed:admin
     envVars:
       - key: NODE_ENV
         value: production
@@ -28,5 +29,3 @@ services:
         value: admin@example.com
       - key: ADMIN_DEPARTMENT
         value: IT
-    postDeployCommand: npm run db:push && npm run seed:admin
-
