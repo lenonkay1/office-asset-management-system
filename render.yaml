@@ -1,28 +1,42 @@
 # Exported from Render on 2025-08-26T12:54:27Z
-services:
-- type: web
-  name: office-asset-management
-  runtime: node
-  repo: https://github.com/lenonkay1/office-asset-management-system
-  plan: free
-  envVars:
-  - key: ADMIN_DEPARTMENT
-    sync: false
-  - key: ADMIN_EMAIL
-    sync: false
-  - key: ADMIN_PASSWORD
-    sync: false
-  - key: ADMIN_USERNAME
-    sync: false
-  - key: JWT_SECRET
-    sync: false
-  - key: DATABASE_URL
-    sync: false
-  - key: NODE_ENV
-    sync: false
-  region: oregon
-  buildCommand: npm ci && npm run db:push && npm run seed:admin && npm run build
-  startCommand: npm start
-  healthCheckPath: /
-  autoDeployTrigger: commit
 version: "1"
+
+services:
+  - type: web
+    name: office-asset-management
+    runtime: node
+    repo: https://github.com/lenonkay1/office-asset-management-system
+    plan: free
+    envVars:
+      - key: ADMIN_DEPARTMENT
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeployTrigger: commit
+
+jobs:
+  - type: cron
+    name: db-migrate-and-seed
+    runtime: node
+    repo: https://github.com/lenonkay1/office-asset-management-system
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+    schedule: "manual" # won’t run automatically; trigger it when needed
+    buildCommand: npm ci
+    startCommand: npm run db:push && npm run seed:admin
