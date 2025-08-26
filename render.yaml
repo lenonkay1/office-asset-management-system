@@ -1,9 +1,14 @@
+databases:
+  - name: office-assets-db
+    plan: free
+
 services:
   - type: web
     name: office-asset-management
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build
+    preDeployCommand: npm run db:push && npm run seed:admin
     startCommand: npm start
     autoDeployTrigger: commit
     healthCheckPath: /
@@ -22,3 +27,5 @@ services:
         value: admin123
       - key: ADMIN_EMAIL
         value: admin@example.com
+      - key: ADMIN_DEPARTMENT
+        value: IT
