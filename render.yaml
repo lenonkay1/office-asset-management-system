@@ -1,14 +1,9 @@
-databases:
-  - name: office-assets-db
-    plan: free
-
 services:
   - type: web
     name: office-asset-management
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
-    preDeployCommand: npm run db:push && npm run seed:admin
+    buildCommand: npm ci && npm run db:push && npm run seed:admin && npm run build
     startCommand: npm start
     autoDeployTrigger: commit
     healthCheckPath: /
