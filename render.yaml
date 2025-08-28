@@ -33,7 +33,12 @@
 
 
 # Exported from Render on 2025-08-26T12:54:27Z
+
 version: "1"
+
+databases:
+  - name: office-assets-db
+    plan: free
 
 services:
   - type: web
@@ -41,6 +46,11 @@ services:
     runtime: node
     repo: https://github.com/lenonkay1/office-asset-management-system
     plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
     envVars:
       - key: ADMIN_DEPARTMENT
         sync: false
@@ -53,24 +63,10 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: office-assets-db
+          property: connectionString
       - key: NODE_ENV
         value: production
-    region: oregon
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
-    healthCheckPath: /
-    autoDeployTrigger: commit
-
-jobs:
-  - type: cron
-    name: db-migrate-and-seed
-    runtime: node
-    repo: https://github.com/lenonkay1/office-asset-management-system
-    plan: free
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-    schedule: "manual" # won’t run automatically; trigger it when needed
-    buildCommand: npm ci
-    startCommand: npm run db:push && npm run seed:admin
+    postDeployCommand: |
+      npm run db:push && npm run seed:admin
